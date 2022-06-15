@@ -32,6 +32,7 @@ import markupbase
 import mtranslate
 import updater
 import addonHandler, languageHandler
+import re
 
 addonHandler.initTranslation()
 #
@@ -47,36 +48,45 @@ _enableTranslation = False
 _lastTranslatedText = None
 _lastTranslatedTextTime = 0
 
-
+        
 def translate(text):
-        """translates the given text to the desired language.
+        # 不含连续两个字母以上的单词,就跳过翻译,直接返回
+        apple = re.search(r'[a-zA-Z]{2,}', text)
+        if apple:
+                """translates the given text to the desired language.
 Stores the result into the cache so that the same translation does not asks Google servers too often.
-        """
-        global _translationCache, _enableTranslation, _gpObject
+                """
+                global _translationCache, _enableTranslation, _gpObject
 
-        try:
-                appName = globalVars.focusObject.appModule.appName
-        except:
-                appName = "__global__"
-                
-        if _gpObject is None or _enableTranslation is False:
-                return text
-        appTable = _translationCache.get(appName, None)
-        if appTable is None:
-                _translationCache[appName] = {}
-        translated = _translationCache[appName].get(text, None)
-        if translated is not None and translated != text:
-                return translated
-        try:
-                prepared = text.encode('utf8', ':/')
-                translated = mtranslate.translate(prepared, _gpObject.language)
-        except Exception as e:
-                return text
-        if translated is None or len(translated) == 0:
-                translated = text
+                try:
+                        appName = globalVars.focusObject.appModule.appName
+                except:
+                        appName = "__global__"
+                        
+                if _gpObject is None or _enableTranslation is False:
+                        return text
+                appTable = _translationCache.get(appName, None)
+                if appTable is None:
+                        _translationCache[appName] = {}
+                translated = _translationCache[appName].get(text, None)
+                if translated is not None and translated != text:
+                        return text + "是" + translated
+                try:
+                        prepared = text.encode('utf8', ':/')
+                        translated = mtranslate.translate(prepared, _gpObject.language)
+                except Exception as e:
+                        return text
+                if translated is None or len(translated) == 0:
+                        translated = text
+                else:
+                        _translationCache[appName][text] = translated
+                return text + "是" + translated
+
         else:
-                _translationCache[appName][text] = translated
-        return translated
+                return text
+                
+        
+        
 
 
 #
@@ -425,7 +435,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
                 if _lastTranslatedText is not None and len(_lastTranslatedText) > 0:
                         api.copyToClip(_lastTranslatedText)
-                        ui.message(_("translation {text} ¨copied to clipboard".format(text=_lastTranslatedText)))
+                        ui.message(_("translation {text} ¨copied to clipboard").format(text=_lastTranslatedText))
                 else:
                         ui.message(_("No translation to copy"))
         script_copyLastTranslation.__doc__ = _("Copy the latest translated text to the clipboard.")
@@ -457,7 +467,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                         ui.message(_("No focused application"))
                         return
                 if scriptHandler.getLastScriptRepeatCount() == 0:
-                        ui.message(_("Press twice to delete all translations for {app}".format(app=appName)))
+                        ui.message(_("Press twice to delete all translations for {app}").format(app=appName))
                         return
                 
                 global _translationCache
@@ -471,9 +481,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                                 logHandler.log.error("Failed to remove cache for {appName}: {e}".format(appName=appName, e=e))
                                 ui.message(_("Error while deleting application's translation cache."))
                                 return
-                        ui.message(_("Translation cache for {app} has been deleted.".format(app=appName)))
+                        ui.message(_("Translation cache for {app} has been deleted.").format(app=appName))
                 else:
-                        ui.message(_("No saved translations for {app}".format(app=appName)))
+                        ui.message(_("No saved translations for {app}").format(app=appName))
                         
         script_flushCurrentAppCache.__doc__ = _("Remove translation cache for the currently focused application")
                                                                                                                                 
